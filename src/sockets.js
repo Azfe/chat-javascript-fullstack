@@ -1,0 +1,68 @@
+module.exports = function(io){ //Función que es exportada
+
+    let users = { // Se declara objeto para almacenar usuarios. Esto simula almacenamiento en una BBDD.
+        "Azfe" : {
+
+        }
+    };         
+    
+    io.on('connection', socket => {
+        console.log('new user connected');
+
+        socket.on('new user', (data, cb) => { // Se escucha evento desde el cliente. Recibe datos y callback por parámetros
+            
+            //console.log(data);
+
+            if(data in users) { // Si existe devuelve el indice de la pos. en array. Si no, devuelve -1
+                cb(false);
+            }else{
+                cb(true);
+                socket.nickname = data;
+                users[socket.nickname] = socket;
+                //users.push(socket.nickname) // Se envía el nick del usuario
+                updateNicknames();
+            }
+        });
+
+        socket.on('send message', (data, cb) => { // Se envia el mensaje introducido al servidor 
+            // "/w Azfe adsafdsgs"
+            var msg = data.trim(); // método trim() se encarga de eliminar los espacios de más de los textos
+
+            if(msg.substr(0,3) === '/w '){
+                msg = msg.substr(3);
+                const index = msg.indexOf(' ');
+                if(index !== -1){
+                    var name = msg.substring(0, index);
+                    var msg = msg.substring(index + 1);
+                    if(name in users){
+                        users[name].emit('whisper', { // Se emite evento de socket llamado whisper al usuario indicado. (Envío de mensaje privado)
+                            msg: msg,
+                            nick: socket.nickname,
+                        });
+                    }else{ // En el caso de que el usuario receptor del msg no se encuentre conectado
+                        cb('Error! Por favor, introduce un usuario conectado');
+                    }
+                }else{
+                        cb('Error! Por favor, ingrese su mensaje');
+                }
+            }else{
+                io.sockets.emit('new message', {
+                    msg: data,
+                    nick: socket.nickname
+                });
+            }
+        });
+
+        socket.on('disconnect', data =>{
+            if(!socket.nickname) return;
+            delete users[socket.nickname]; // Desde el objeto users se elimina aquel que tenga el nickname del socket que se está desconectando.
+            //nicknames.splice(nicknames.indexOf(socket.nickname), 1) // método splice permite quitar un solo elemento indicándolo en el indice
+            io.sockets.emit('usernames', nicknames);
+            updateNicknames();
+        });
+
+        function updateNicknames(){
+            io.sockets.emit('usernames', Object.keys(users)); // Envía todos los usuarios almacenados en el array
+        }
+    });
+}
