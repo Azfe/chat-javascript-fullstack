@@ -1,13 +1,17 @@
+const Chat = require('./models/Chat'); // Se importa el Schema
+
 module.exports = function(io){ //Función que es exportada
 
     let users = { // Se declara objeto para almacenar usuarios. Esto simula almacenamiento en una BBDD.
         "Azfe" : {
-
         }
     };         
     
-    io.on('connection', socket => {
+    io.on('connection', async socket => {
         console.log('new user connected');
+
+        let messages = await Chat.find({});
+        socket.emit('carga los mensajes antiguos', messages);
 
         socket.on('new user', (data, cb) => { // Se escucha evento desde el cliente. Recibe datos y callback por parámetros
             
@@ -24,7 +28,7 @@ module.exports = function(io){ //Función que es exportada
             }
         });
 
-        socket.on('send message', (data, cb) => { // Se envia el mensaje introducido al servidor 
+        socket.on('send message', async(data, cb) => { // Se envia el mensaje introducido al servidor | async para que funcione de forma asincrona
             // "/w Azfe adsafdsgs"
             var msg = data.trim(); // método trim() se encarga de eliminar los espacios de más de los textos
 
@@ -46,6 +50,13 @@ module.exports = function(io){ //Función que es exportada
                         cb('Error! Por favor, ingrese su mensaje');
                 }
             }else{
+
+                var newMsg = new Chat({ // Schema
+                    msg: msg,
+                    nick: socket.nickname
+                });
+                await newMsg.save();
+
                 io.sockets.emit('new message', {
                     msg: data,
                     nick: socket.nickname
